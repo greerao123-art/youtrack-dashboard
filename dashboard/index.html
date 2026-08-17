@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTrack Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .timestamp {
+            color: #666;
+            font-size: 14px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 10px 0;
+        }
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        th {
+            background: #ecf0f1;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #2c3e50;
+            border-bottom: 2px solid #bdc3c7;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        tr:hover {
+            background: #f9f9f9;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+        .error {
+            background: #fadbd8;
+            color: #c0392b;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 YouTrack Dashboard</h1>
+            <div class="timestamp">Last updated: <span id="lastUpdated">Loading...</span></div>
+        </header>
+
+        <div id="content" class="loading">Loading dashboard...</div>
+    </div>
+
+    <script>
+        async function loadDashboard() {
+            try {
+                const response = await fetch('data.json');
+                if (!response.ok) throw new Error('Failed to fetch data');
+                
+                const data = await response.json();
+                displayDashboard(data);
+            } catch (error) {
+                document.getElementById('content').innerHTML = `
+                    <div class="error">⚠️ Error loading dashboard: ${error.message}</div>
+                `;
+            }
+        }
+
+        function displayDashboard(data) {
+            const issues = data.issues || [];
+            
+            // Count by status
+            const statusCounts = {};
+            issues.forEach(issue => {
+                const status = issue.state || 'Unknown';
+                statusCounts[status] = (statusCounts[status] || 0) + 1;
+            });
+
+            // Count by priority
+            const priorityCounts = {};
+            issues.forEach(issue => {
+                const priority = issue.priority || 'Unset';
+                priorityCounts[priority] = (priorityCounts[priority] || 0) + 1;
+            });
+
+            const html = `
+                <div class="grid">
+                    <div class="card stat">
+                        <div class="stat-label">Total Issues</div>
+                        <div class="stat-value">${issues.length}</div>
+                    </div>
+                    <div class="card stat">
+                        <div class="stat-label">Unique Processors</div>
+                        <div class="stat-value">${new Set(issues.map(i => i.processor).filter(Boolean)).size}</div>
+                    </div>
+                    <div class="card stat">
+                        <div class="stat-label">Unique Platforms</div>
+                        <div class="stat-value">${new Set(issues.map(i => i.platform).filter(Boolean)).size}</div>
+                    </div>
+                </div>
+
+                <div class="grid">
+                    <div class="card">
+                        <h3>Issues by Status</h3>
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                    <div class="card">
+                        <h3>Issues by Priority</h3>
+                        <canvas id="priorityChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>All Issues</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Summary</th>
+                                <th>Created</th>
+                                <th>Status</th>
+                                <th>Priority</th>
+                                <th>Processor</th>
+                                <th>Client</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${issues.map(issue => `
+                                <tr>
+                                    <td>${issue.id}</td>
+                                    <td>${issue.summary.substring(0, 50)}...</td>
+                                    <td>${issue.created || '-'}</td>
+                                    <td>${issue.state || '-'}</td>
+                                    <td>${issue.priority || '-'}</td>
+                                    <td>${issue.processor || '-'}</td>
+                                    <td>${issue.clientName || '-'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            document.getElementById('content').innerHTML = html;
+            document.getElementById('lastUpdated').textContent = data.lastUpdated;
+
+            // Draw charts after DOM is ready
+            setTimeout(() => {
+                drawStatusChart(statusCounts);
+                drawPriorityChart(priorityCounts);
+            }, 100);
+        }
+
+        function drawStatusChart(statusCounts) {
+            const ctx = document.getElementById('statusChart')?.getContext('2d');
+            if (!ctx) return;
+            
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(statusCounts),
+                    datasets: [{
+                        data: Object.values(statusCounts),
+                        backgroundColor: ['#3498db', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+
+        function drawPriorityChart(priorityCounts) {
+            const ctx = document.getElementById('priorityChart')?.getContext('2d');
+            if (!ctx) return;
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(priorityCounts),
+                    datasets: [{
+                        label: 'Count',
+                        data: Object.values(priorityCounts),
+                        backgroundColor: '#3498db'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // Load on page load
+        loadDashboard();
+    </script>
+</body>
+</html>
