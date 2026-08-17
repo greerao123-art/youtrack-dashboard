@@ -1,1 +1,30 @@
+name: Build Dashboard
 
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Run dashboard script
+        env:
+          YOUTRACK_API_TOKEN: ${{ secrets.YOUTRACK_API_TOKEN }}
+        run: node scripts/fetch-data.js
+      
+      - name: Commit changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add dashboard/data.json dashboard/index.html
+          git commit -m "Update dashboard $(date)" || true
+          git push
