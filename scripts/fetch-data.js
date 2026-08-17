@@ -34,7 +34,7 @@ function makeRequest(queryPath) {
 async function fetchDashboardData() {
   try {
     const query = encodeURIComponent('(project: QAPMAP-Product-Support) and (created: 2026-08-01 .. *)');
-    const fields = 'idReadable,summary,description,customFields(name,value(text,name,presentation)),comments(text,created,author(login))';
+    const fields = 'idReadable,summary,description,created,customFields(name,value(text,name,presentation)),comments(text,created,author(login))';
     const path = `/api/issues?query=${query}&fields=${fields}&$top=1000`;
 
     const response = await makeRequest(path);
