@@ -64,6 +64,7 @@ async function fetchDashboardData() {
         id: issue.idReadable,
         summary: issue.summary,
         description: issue.description,
+        created: new Date(issue.created).toLocaleDateString(),
         processor: customFieldsMap['Processor'],
         platform: customFieldsMap['Platform'],
         serverName: customFieldsMap['Server Name'],
